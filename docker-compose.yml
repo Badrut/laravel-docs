@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: laravel-doc-app
+    container_name: app_laravel
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+    networks:
+      - doc-net
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: db_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: app_db
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: root
+    volumes:
+      - dbdata:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - doc-net
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: pma_mysql
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8081:80"
+    networks:
+      - doc-net
+    depends_on:
+      - db
+
+networks:
+  doc-net:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
