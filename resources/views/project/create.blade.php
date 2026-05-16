@@ -110,6 +110,17 @@
         
         <form action="{{ route('projects.store') }}" method="POST" enctype="multipart/form-data" id="spjForm">
             @csrf
+
+            @if ($errors->any())
+            <div class="alert alert-danger mb-3">
+                <strong><i class="fas fa-exclamation-triangle me-2"></i>Validasi Gagal! Periksa kembali isian berikut:</strong>
+                <ul class="mb-0 mt-2">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
             
             <div class="card">
                 <div class="card-header border-bottom">
@@ -232,9 +243,19 @@
                                                 <input type="date" name="work_order_date" class="form-control">
                                             </div>
                                             <div class="p-3 bg-light rounded mb-3">
-                                                <label class="small mb-1 fw-bold">BA Penyerahan / Handover</label>
+                                                <label class="small mb-1 fw-bold">Kontraktor</label>
+                                                <input type="text" name="contractor_number" class="form-control mb-1" placeholder="No. Kontrak">
+                                                <input type="date" name="contractor_date" class="form-control">
+                                            </div>
+                                            <div class="p-3 bg-light rounded mb-3">
+                                                <label class="small mb-1 fw-bold">BA Penyerahan</label>
                                                 <input type="text" name="handover_report_number" class="form-control mb-1" placeholder="No. BAST">
                                                 <input type="date" name="handover_report_date" class="form-control">
+                                            </div>
+                                            <div class="p-3 bg-light rounded mb-3">
+                                                <label class="small mb-1 fw-bold">Laporan Pembayaran</label>
+                                                <input type="text" name="payment_report_number" class="form-control mb-1" placeholder="No. Laporan Pembayaran">
+                                                <input type="date" name="payment_report_date" class="form-control">
                                             </div>
                                             <div class="p-3 bg-light rounded mb-3">
                                                 <label class="small mb-1 fw-bold">Kwitansi & Pembayaran</label>

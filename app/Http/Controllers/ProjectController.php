@@ -42,6 +42,8 @@ class ProjectController extends Controller
             'start_date'                => 'required|date',
             'end_date'                  => 'required|date|after_or_equal:start_date',
             'contractor_name'           => 'nullable|string|max:255',
+            'contractor_number'         => 'nullable|string|max:255',
+            'contractor_date'           => 'nullable|date',
             'person_in_charge'          => 'nullable|string|max:255',
             'budget_date'               => 'nullable|date',
             'principal_name'            => 'nullable|string|max:255',
@@ -56,9 +58,16 @@ class ProjectController extends Controller
             'work_order_date'           => 'nullable|date',
             'handover_report_number'    => 'nullable|string|max:100',
             'handover_report_date'      => 'nullable|date',
+            'payment_report_number'     => 'nullable|string|max:255',
+            'payment_report_date'       => 'nullable|date',
             'receipt_receiver'          => 'nullable|string|max:255',
             'invitation_number'         => 'nullable|string|max:100',
             'invitation_date'           => 'nullable|date',
+            'tax_ppn'                   => 'nullable|numeric|min:0',
+            'tax_pph21'                 => 'nullable|numeric|min:0',
+            'tax_pph22'                 => 'nullable|numeric|min:0',
+            'tax_pph23'                 => 'nullable|numeric|min:0',
+            'tax_pph_final'             => 'nullable|numeric|min:0',
             'items'                     => 'required|array|min:1',
             'items.*.type'              => 'required|in:material,labor',
             'items.*.item_name'         => 'required|string|max:255',
@@ -66,14 +75,14 @@ class ProjectController extends Controller
             'items.*.unit'              => 'required|string|max:50',
             'items.*.unit_price'        => 'required|numeric|min:0',
             'workers'                   => 'required|array|min:1',
-            'workers.*'                 => 'required|exists:workers,id',
+            'workers.*'                 => 'nullable|exists:workers,id',
             'attendance_dates'          => 'nullable|array',
             'attendance_dates.*'        => 'date',
             'images'                    => 'nullable|array',
-            'images.*'                  => 'image|mimes:jpeg,png,jpg|max:5120',
-            'kop_school'                => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'kop_contractor'            => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-        ]);
+            'images.*'                  => 'image|mimes:jpeg,png,jpg',
+            'kop_school'                => 'nullable|image|mimes:jpeg,png,jpg',
+            'kop_contractor'            => 'nullable|image|mimes:jpeg,png,jpg',
+        ]);             
 
         DB::beginTransaction();
 
@@ -101,6 +110,8 @@ class ProjectController extends Controller
                 'implementation_period'     => $implementationPeriod,
                 'attendance_period'         => $attendancePeriod,
                 'contractor_name'           => $request->contractor_name,
+                'contractor_number'         => $request->contractor_number,
+                'contractor_date'           => $request->contractor_date,
                 'contractor_address'        => $request->contractor_address,
                 'person_in_charge'          => $request->person_in_charge,
                 'principal_name'            => $request->principal_name,
@@ -116,17 +127,18 @@ class ProjectController extends Controller
                 'work_order_date'           => $request->work_order_date,
                 'handover_report_number'    => $request->handover_report_number,
                 'handover_report_date'      => $request->handover_report_date,
+                'payment_report_number'     => $request->payment_report_number,
+                'payment_report_date'       => $request->payment_report_date,
                 'receipt_number'            => $request->receipt_number,
                 'receipt_date'              => $request->receipt_date,
                 'receipt_receiver'          => $request->receipt_receiver,
                 'invitation_number'         => $request->invitation_number,
                 'invitation_date'           => $request->invitation_date,
-                'tax_vat'                   => 0,
-                'tax_pph21'                 => 0,
-                'tax_pph22'                 => 0,
-                'tax_pph23'                 => 0,
-                'tax_pph_final'             => 0,
-                
+                'tax_vat'                   => $request->tax_ppn ?? 0,
+                'tax_pph21'                 => $request->tax_pph21 ?? 0,
+                'tax_pph22'                 => $request->tax_pph22 ?? 0,
+                'tax_pph23'                 => $request->tax_pph23 ?? 0,
+                'tax_pph_final'             => $request->tax_pph_final ?? 0,
             ]);
 
             foreach ($request->items as $item) {
@@ -152,8 +164,13 @@ class ProjectController extends Controller
 
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $image) {
-                    $path = $image->store('dokumentasi_spj', 'public'); 
-
+                    if (!$image->isValid()) {
+                        continue; // skip file rusak/gagal upload
+                    }
+                    $path = $image->store('dokumentasi_spj', 'public');
+                    if ($path === false) {
+                        continue; // skip jika store() gagal (disk penuh, permission, dll)
+                    }
                     $project->images()->create([
                         'file_path' => $path,
                     ]);
@@ -161,13 +178,23 @@ class ProjectController extends Controller
             }
 
             if ($request->hasFile('kop_school')) {
-                $kopSchoolPath = $request->file('kop_school')->store('kop', 'public');
-                $project->update(['kop_school' => $kopSchoolPath]);
+                $kop = $request->file('kop_school');
+                if ($kop->isValid()) {
+                    $kopSchoolPath = $kop->store('kop', 'public');
+                    if ($kopSchoolPath !== false) {
+                        $project->update(['kop_school' => $kopSchoolPath]);
+                    }
+                }
             }
 
             if ($request->hasFile('kop_contractor')) {
-                $kopContractorPath = $request->file('kop_contractor')->store('kop', 'public');
-                $project->update(['kop_contractor' => $kopContractorPath]);
+                $kop = $request->file('kop_contractor');
+                if ($kop->isValid()) {
+                    $kopContractorPath = $kop->store('kop', 'public');
+                    if ($kopContractorPath !== false) {
+                        $project->update(['kop_contractor' => $kopContractorPath]);
+                    }
+                }
             }
 
             DB::commit();
@@ -191,6 +218,8 @@ class ProjectController extends Controller
             'start_date'                => 'required|date',
             'end_date'                  => 'required|date|after_or_equal:start_date',
             'contractor_name'           => 'nullable|string|max:255',
+            'contractor_number'         => 'nullable|string|max:255',
+            'contractor_date'           => 'nullable|date',
             'person_in_charge'          => 'nullable|string|max:255',
             'budget_date'               => 'nullable|date',
             'principal_name'            => 'nullable|string|max:255',
@@ -205,9 +234,16 @@ class ProjectController extends Controller
             'work_order_date'           => 'nullable|date',
             'handover_report_number'    => 'nullable|string|max:100',
             'handover_report_date'      => 'nullable|date',
+            'payment_report_number'     => 'nullable|string|max:255',
+            'payment_report_date'       => 'nullable|date',
             'receipt_receiver'          => 'nullable|string|max:255',
             'invitation_number'         => 'nullable|string|max:100',
             'invitation_date'           => 'nullable|date',
+            'tax_ppn'                   => 'nullable|numeric|min:0',
+            'tax_pph21'                 => 'nullable|numeric|min:0',
+            'tax_pph22'                 => 'nullable|numeric|min:0',
+            'tax_pph23'                 => 'nullable|numeric|min:0',
+            'tax_pph_final'             => 'nullable|numeric|min:0',
             'items'                     => 'required|array|min:1',
             'items.*.type'              => 'required|in:material,labor',
             'items.*.item_name'         => 'required|string|max:255',
@@ -215,18 +251,13 @@ class ProjectController extends Controller
             'items.*.unit'              => 'required|string|max:50',
             'items.*.unit_price'        => 'required|numeric|min:0',
             'workers'                   => 'required|array|min:1',
-            'workers.*'                 => 'required|exists:workers,id',
+            'workers.*'                 => 'nullable|exists:workers,id',
             'attendance_dates'          => 'nullable|array',
             'attendance_dates.*'        => 'date',
             'images'                    => 'nullable|array',
-            'images.*'                  => 'image|mimes:jpeg,png,jpg|max:5120',
-            'tax_vat'                   => 'nullable|numeric|min:0',
-            'tax_pph21'                 => 'nullable|numeric|min:0',
-            'tax_pph22'                 => 'nullable|numeric|min:0',
-            'tax_pph23'                 => 'nullable|numeric|min:0',
-            'tax_pph_final'             => 'nullable|numeric|min:0',
-            'kop_school'                => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'kop_contractor'            => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'images.*'                  => 'image|mimes:jpeg,png,jpg',
+            'kop_school'                => 'nullable|image|mimes:jpeg,png,jpg',
+            'kop_contractor'            => 'nullable|image|mimes:jpeg,png,jpg',
         ]);
 
         DB::beginTransaction();
@@ -255,8 +286,10 @@ class ProjectController extends Controller
                 'implementation_period'     => $implementationPeriod,
                 'attendance_period'         => $attendancePeriod,
                 'contractor_name'           => $request->contractor_name,
+                'contractor_number'         => $request->contractor_number,
+                'contractor_date'           => $request->contractor_date,
                 'contractor_address'        => $request->contractor_address,
-                'person_in_charge'          => $request->person_in_charge,               
+                'person_in_charge'          => $request->person_in_charge,
                 'principal_name'            => $request->principal_name,
                 'principal_nip'             => $request->principal_nip,
                 'facilities_head_name'      => $request->facilities_head_name,
@@ -264,18 +297,20 @@ class ProjectController extends Controller
                 'treasurer_name'            => $request->treasurer_name,
                 'treasurer_nip'             => $request->treasurer_nip,
                 'admin_head_name'           => $request->admin_head_name,
-                'admin_head_nip'            => $request->admin_head_nip,                
+                'admin_head_nip'            => $request->admin_head_nip,
                 'budget_date'               => $request->budget_date,
                 'work_order_number'         => $request->work_order_number,
                 'work_order_date'           => $request->work_order_date,
                 'handover_report_number'    => $request->handover_report_number,
                 'handover_report_date'      => $request->handover_report_date,
+                'payment_report_number'     => $request->payment_report_number,
+                'payment_report_date'       => $request->payment_report_date,
                 'receipt_number'            => $request->receipt_number,
                 'receipt_date'              => $request->receipt_date,
                 'receipt_receiver'          => $request->receipt_receiver,
                 'invitation_number'         => $request->invitation_number,
                 'invitation_date'           => $request->invitation_date,
-                'tax_vat'                   => $request->tax_vat ?? $project->tax_vat,
+                'tax_vat'                   => $request->tax_ppn ?? $project->tax_vat,
                 'tax_pph21'                 => $request->tax_pph21 ?? $project->tax_pph21,
                 'tax_pph22'                 => $request->tax_pph22 ?? $project->tax_pph22,
                 'tax_pph23'                 => $request->tax_pph23 ?? $project->tax_pph23,
@@ -405,7 +440,9 @@ class ProjectController extends Controller
         $safeName        = preg_replace('/[^A-Za-z0-9_\-]/', '_', $project->project_name);
         $workingTemplate = $tempDir . '/tpl_' . $safeName . '_' . time() . '.docx';
         copy($templatePath, $workingTemplate);
+
         $this->replaceKopDocx($workingTemplate, $project);
+
         $templateProcessor = new TemplateProcessor($workingTemplate);
         $images = $project->images;
         foreach ($images as $index => $img) {
@@ -799,8 +836,8 @@ class ProjectController extends Controller
     private function replaceKopDocx(string $docxPath, $project): void
     {
         $kopMap = [
-            'kop_contractor'     => 'image1.jpg',
-            'kop_school' => 'image3.jpg',
+            'kop_contractor'   => 'image6.jpg',
+            'kop_school' => 'image1.jpg',
             
         ];
 

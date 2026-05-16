@@ -244,10 +244,22 @@
                                                     value="{{ old('work_order_date', $fmt($project->work_order_date)) }}">
                                             </div>
                                             <div class="p-3 bg-light rounded mb-3">
-                                                <label class="small mb-1 fw-bold">BA Penyerahan / Handover</label>
+                                                <label class="small mb-1 fw-bold">Kontraktor </label>
+                                                <input type="text" name="contractor_number" class="form-control mb-1" value="{{ old('contractor_number', $project->contractor_number) }}" placeholder="No. Kontrak">
+                                                <input type="date" name="contractor_date" class="form-control"
+                                                    value="{{ old('contractor_date', $fmt($project->contractor_date)) }}">
+                                            </div>
+                                            <div class="p-3 bg-light rounded mb-3">
+                                                <label class="small mb-1 fw-bold">BA Penyerahan </label>
                                                 <input type="text" name="handover_report_number" class="form-control mb-1" value="{{ old('handover_report_number', $project->handover_report_number) }}">
                                                 <input type="date" name="handover_report_date" class="form-control" 
                                                     value="{{ old('handover_report_date', $fmt($project->handover_report_date)) }}">
+                                            </div>
+                                            <div class="p-3 bg-light rounded mb-3">
+                                                <label class="small mb-1 fw-bold">Laporan Pembayaran</label>
+                                                <input type="text" name="payment_report_number" class="form-control mb-1" value="{{ old('payment_report_number', $project->payment_report_number) }}" placeholder="No. Laporan Pembayaran">
+                                                <input type="date" name="payment_report_date" class="form-control"
+                                                    value="{{ old('payment_report_date', $fmt($project->payment_report_date)) }}">
                                             </div>
                                             <div class="p-3 bg-light rounded mb-3">
                                                 <label class="small mb-1 fw-bold">Kwitansi & Pembayaran</label>
