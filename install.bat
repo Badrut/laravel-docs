@@ -9,9 +9,40 @@ echo ============================================================
 echo.
 
 :: ============================================================
+:: CLONE REPOSITORY
+:: ============================================================
+echo [1/10] Memeriksa Git dan Mengambil Source Code...
+git --version > nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Git tidak ditemukan!
+    echo Pastikan Git sudah terinstall. Download dari: https://git-scm.com/downloads
+    pause
+    exit /b 1
+)
+
+set REPO_URL=https://github.com/Badrut/laravel-docs
+set FOLDER_NAME=laravel-docs
+
+if exist "%FOLDER_NAME%\" (
+    echo [INFO] Folder '%FOLDER_NAME%' sudah ada. Melewati proses clone...
+    cd "%FOLDER_NAME%"
+) else (
+    echo Menge-clone repositori %REPO_URL% ...
+    git clone %REPO_URL% %FOLDER_NAME%
+    if %errorlevel% neq 0 (
+        echo [ERROR] Gagal menge-clone repositori! Pastikan koneksi internet aman.
+        pause
+        exit /b 1
+    )
+    echo [OK] Repositori berhasil di-clone.
+    cd "%FOLDER_NAME%"
+)
+
+:: ============================================================
 :: CEK PHP
 :: ============================================================
-echo [1/8] Memeriksa PHP...
+echo.
+echo [2/10] Memeriksa PHP...
 php -v > nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] PHP tidak ditemukan!
@@ -24,11 +55,18 @@ for /f "tokens=2 delims= " %%v in ('php -r "echo PHP_VERSION;"') do set PHP_VERS
 echo [OK] PHP ditemukan: %PHP_VERSION%
 
 :: ============================================================
+:: KONFIGURASI LIMIT PHP.INI
+:: ============================================================
+echo.
+echo [3/10] Mengatur Limit php.ini (Upload 500M)...
+php -r "$ini = php_ini_loaded_file(); if ($ini) { $c = file_get_contents($ini); $c = preg_replace('/^;?upload_max_filesize.*/m', 'upload_max_filesize = 500M', $c); $c = preg_replace('/^;?post_max_size.*/m', 'post_max_size = 500M', $c); $c = preg_replace('/^;?memory_limit.*/m', 'memory_limit = 512M', $c); $c = preg_replace('/^;?max_execution_time.*/m', 'max_execution_time = 300', $c); file_put_contents($ini, $c); echo '[OK] Limit berhasil dinaikkan: 500M.' . PHP_EOL; } else { echo '[PERINGATAN] File php.ini tidak ditemukan, ganti manual nanti.' . PHP_EOL; }"
+
+:: ============================================================
 :: CEK COMPOSER
 :: ============================================================
 echo.
-echo [2/8] Memeriksa Composer...
-composer -V > nul 2>&1
+echo [4/10] Memeriksa Composer...
+call composer -V > nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Composer tidak ditemukan!
     echo Download dari: https://getcomposer.org/download/
@@ -41,7 +79,7 @@ echo [OK] Composer ditemukan.
 :: CEK NODE.JS
 :: ============================================================
 echo.
-echo [3/8] Memeriksa Node.js...
+echo [5/10] Memeriksa Node.js...
 node -v > nul 2>&1
 if %errorlevel% neq 0 (
     echo [PERINGATAN] Node.js tidak ditemukan. Melewati build aset frontend...
@@ -55,7 +93,7 @@ if %errorlevel% neq 0 (
 :: SALIN .env
 :: ============================================================
 echo.
-echo [4/8] Menyiapkan file konfigurasi (.env)...
+echo [6/10] Menyiapkan file konfigurasi (.env)...
 if not exist ".env" (
     copy ".env.example" ".env" > nul
     echo [OK] File .env berhasil dibuat dari .env.example
@@ -63,13 +101,9 @@ if not exist ".env" (
     echo [INFO] File .env sudah ada, dilewati.
 )
 
-:: ============================================================
-:: TANYA KONFIGURASI DATABASE
-:: ============================================================
-echo.
 echo ============================================================
 echo  KONFIGURASI DATABASE
-echo  Pastikan MySQL/MariaDB sudah berjalan (Laragon / XAMPP)
+echo  Pastikan MySQL/MariaDB sudah berjalan di Laragon
 echo ============================================================
 set /p DB_NAME=Nama database [default: app_db]: 
 if "%DB_NAME%"=="" set DB_NAME=app_db
@@ -83,45 +117,15 @@ set /p DB_PORT=Port MySQL [default: 3306]:
 if "%DB_PORT%"=="" set DB_PORT=3306
 
 :: Update .env dengan konfigurasi database
-php -r "
-$env = file_get_contents('.env');
-$env = preg_replace('/^DB_DATABASE=.*/m', 'DB_DATABASE=%DB_NAME%', $env);
-$env = preg_replace('/^DB_USERNAME=.*/m', 'DB_USERNAME=%DB_USER%', $env);
-$env = preg_replace('/^DB_PASSWORD=.*/m', 'DB_PASSWORD=%DB_PASS%', $env);
-$env = preg_replace('/^DB_PORT=.*/m', 'DB_PORT=%DB_PORT%', $env);
-$env = preg_replace('/^DB_HOST=.*/m', 'DB_HOST=127.0.0.1', $env);
-$env = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=mysql', $env);
-file_put_contents('.env', $env);
-echo 'Konfigurasi database disimpan.' . PHP_EOL;
-"
-echo [OK] Konfigurasi database diperbarui.
-
-:: ============================================================
-:: BUAT DATABASE (jika belum ada)
-:: ============================================================
-echo.
-echo [INFO] Mencoba membuat database '%DB_NAME%' jika belum ada...
-if "%DB_PASS%"=="" (
-    mysql -u %DB_USER% -P %DB_PORT% -e "CREATE DATABASE IF NOT EXISTS \`%DB_NAME%\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2> nul
-) else (
-    mysql -u %DB_USER% -p%DB_PASS% -P %DB_PORT% -e "CREATE DATABASE IF NOT EXISTS \`%DB_NAME%\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2> nul
-)
-if %errorlevel% neq 0 (
-    echo [PERINGATAN] Tidak bisa membuat database otomatis.
-    echo Silakan buat database '%DB_NAME%' secara manual di phpMyAdmin atau HeidiSQL.
-    echo Tekan Enter setelah database dibuat...
-    pause
-) else (
-    echo [OK] Database '%DB_NAME%' siap.
-)
+php -r "$env = file_get_contents('.env'); $env = preg_replace('/^DB_DATABASE=.*/m', 'DB_DATABASE=%DB_NAME%', $env); $env = preg_replace('/^DB_USERNAME=.*/m', 'DB_USERNAME=%DB_USER%', $env); $env = preg_replace('/^DB_PASSWORD=.*/m', 'DB_PASSWORD=%DB_PASS%', $env); $env = preg_replace('/^DB_PORT=.*/m', 'DB_PORT=%DB_PORT%', $env); $env = preg_replace('/^DB_HOST=.*/m', 'DB_HOST=127.0.0.1', $env); $env = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=mysql', $env); file_put_contents('.env', $env); echo 'Konfigurasi .env diperbarui.' . PHP_EOL;"
 
 :: ============================================================
 :: COMPOSER INSTALL
 :: ============================================================
 echo.
-echo [5/8] Menginstall dependensi PHP (Composer)...
+echo [7/10] Menginstall dependensi PHP (Composer)...
 echo Ini mungkin membutuhkan beberapa menit...
-composer install --no-interaction --optimize-autoloader
+call composer install --no-interaction --optimize-autoloader
 if %errorlevel% neq 0 (
     echo [ERROR] Composer install gagal!
     pause
@@ -130,23 +134,18 @@ if %errorlevel% neq 0 (
 echo [OK] Dependensi PHP berhasil diinstall.
 
 :: ============================================================
-:: GENERATE APP KEY
+:: GENERATE APP KEY & MIGRASI
 :: ============================================================
 echo.
-echo [6/8] Generate Application Key...
+echo [8/10] Generate Application Key & Migrasi Database...
 php artisan key:generate --force
 if %errorlevel% neq 0 (
     echo [ERROR] Gagal generate app key!
     pause
     exit /b 1
 )
-echo [OK] Application key berhasil digenerate.
 
-:: ============================================================
-:: MIGRASI DATABASE
-:: ============================================================
-echo.
-echo Menjalankan migrasi database...
+echo INFO: Jika muncul prompt "Would you like to create it?", ketik "yes" lalu Enter!
 php artisan migrate:fresh --seed
 if %errorlevel% neq 0 (
     echo [ERROR] Migrasi database gagal!
@@ -157,48 +156,36 @@ if %errorlevel% neq 0 (
 echo [OK] Migrasi database berhasil.
 
 :: ============================================================
-:: STORAGE LINK
+:: STORAGE LINK & CACHE
 :: ============================================================
 echo.
-echo Membuat storage link...
-php artisan storage:link --force
-echo [OK] Storage link berhasil dibuat.
-
-:: ============================================================
-:: CLEAR & CACHE CONFIG
-:: ============================================================
-echo.
-echo Membersihkan dan membuat cache konfigurasi...
-php artisan config:clear
-php artisan cache:clear
-php artisan view:clear
-php artisan route:clear
-echo [OK] Cache dibersihkan.
+echo [9/10] Membuat storage link dan membersihkan cache...
+call php artisan storage:link --force > nul 2>&1
+call php artisan optimize:clear > nul 2>&1
+echo [OK] Storage dan cache siap.
 
 :: ============================================================
 :: NPM INSTALL & BUILD
 :: ============================================================
-if "%SKIP_NPM%"=="0" (
-    echo.
-    echo [7/8] Menginstall dependensi Node.js dan build aset...
-    npm install --silent
-    npm run build
-    if %errorlevel% neq 0 (
-        echo [PERINGATAN] Build aset frontend gagal, tapi aplikasi tetap bisa berjalan.
-    ) else (
-        echo [OK] Aset frontend berhasil dibuild.
-    )
-) else (
-    echo.
-    echo [7/8] Melewati build NPM (Node.js tidak ditemukan).
-)
+if "%SKIP_NPM%"=="1" goto skip_npm
+echo.
+echo [10/10] Menginstall dependensi Node.js dan build aset...
+call npm install --silent
+call npm run build
+echo [OK] Aset frontend berhasil dibuild.
+goto finish_setup
 
+:skip_npm
+echo.
+echo [10/10] Melewati build NPM (Node.js tidak ditemukan).
+
+:finish_setup
 :: ============================================================
 :: SELESAI - JALANKAN SERVER
 :: ============================================================
 echo.
 echo ============================================================
-echo  [8/8] SETUP SELESAI!
+echo  [SETUP SELESAI!]
 echo ============================================================
 echo.
 echo  Informasi Aplikasi:
@@ -206,11 +193,15 @@ echo  - URL     : http://localhost:8000
 echo  - Database: %DB_NAME%
 echo  - User DB : %DB_USER%
 echo.
+echo  Catatan Penting:
+echo  Karena php.ini baru saja diubah, DISARANKAN untuk me-RESTART
+echo  Apache/Nginx di aplikasi Laragon agar limit 500M aktif.
+echo.
 echo  Aplikasi akan segera berjalan...
 echo  Tekan Ctrl+C untuk menghentikan server.
 echo ============================================================
 echo.
 
-php artisan serve --host=127.0.0.1 --port=8000
+call php artisan serve --host=127.0.0.1 --port=8000
 
 pause
