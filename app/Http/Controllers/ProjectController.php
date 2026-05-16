@@ -901,27 +901,20 @@ class ProjectController extends Controller
             }
         }
 
-        // ══════════════════════════════════════════════════════
-        // 3. HAPUS srcRect di document.xml untuk gambar ini
-        //    srcRect = crop bawaan template yang bisa bikin gambar
-        //    baru kelihatan terpotong atau tidak muncul sama sekali
-        //    Contoh image3.jpg: t="13725" b="7966" l="3264" r="2394"
-        //    = dipotong 13.7% atas, 7.9% bawah — sangat agresif
-        // ══════════════════════════════════════════════════════
         $doc = $zip->getFromName('word/document.xml');
 
-        // Hapus semua srcRect pada blok yang mereferensikan gambar ini
-        // Caranya: cari nama file di cNvPr, lalu hapus srcRect di blok pic yang sama
+ 
+ 
         $doc = preg_replace_callback(
             '/<pic:pic>(.*?)<\/pic:pic>/s',
             function ($matches) use ($oldMediaFilename, $newMedia) {
                 $block = $matches[0];
-                // Cek apakah blok ini milik gambar yang kita ganti
+              
                 if (
                     str_contains($block, 'name="' . $oldMediaFilename . '"') ||
                     str_contains($block, 'name="' . $newMedia . '"')
                 ) {
-                    // Hapus srcRect — ganti dengan srcRect kosong (no crop)
+                    
                     $block = preg_replace(
                         '/<a:srcRect[^\/]*\/>/',
                         '<a:srcRect/>',
@@ -1243,10 +1236,18 @@ class ProjectController extends Controller
             $sheetHonor->getStyle("B{$rowHonor}:C" . ($rowHonor + $workerCount - 1))
                        ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
 
+            $lastWorkerRow = $rowHonor + $workerCount - 1;
+            $sheetHonor->getStyle("E{$rowHonor}:F{$lastWorkerRow}")
+                       ->getNumberFormat()
+                       ->setFormatCode('#,##0');
+
             $rowJumlah = $rowHonor + $workerCount;
 
             $sheetHonor->setCellValue('A' . $rowJumlah, 'JUMLAH');
             $sheetHonor->setCellValue('F' . $rowJumlah, $grandTotalWeek);
+            $sheetHonor->getStyle("F{$rowJumlah}")
+                       ->getNumberFormat()
+                       ->setFormatCode('#,##0');
             $totalSemuaHonor += $grandTotalWeek;
             $this->generateFooter($sheetHonor, $rowJumlah + 1, $tglAkhirFull, $project, true);
             $mingguKe++;
