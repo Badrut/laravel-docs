@@ -75,12 +75,6 @@
                         
                         <div class="sidenav-menu-heading">Menu Utama</div>
                         
-                        <!-- Menu Dashboard / Proyek -->
-                        <a class="nav-link {{ request()->routeIs('projects.index') ? 'active' : '' }}" href="{{ route('projects.index') }}">
-                            <div class="nav-link-icon"><i data-feather="activity"></i></div>
-                            Dashboard / Proyek
-                        </a>
-
                         <!-- Dropdown Manajemen Proyek / SPJ -->
                         <a class="nav-link {{ request()->routeIs('projects.*') ? '' : 'collapsed' }}" href="javascript:void(0);" data-bs-toggle="collapse" data-bs-target="#collapseSPJ" aria-expanded="{{ request()->routeIs('projects.*') ? 'true' : 'false' }}" aria-controls="collapseSPJ">
                             <div class="nav-link-icon"><i data-feather="folder"></i></div>
@@ -90,7 +84,7 @@
                         <div class="collapse {{ request()->routeIs('projects.*') ? 'show' : '' }}" id="collapseSPJ" data-bs-parent="#accordionSidenav">
                             <nav class="sidenav-menu-nested nav">
                                 <a class="nav-link {{ request()->routeIs('projects.index') ? 'active' : '' }}" href="{{ route('projects.index') }}">Daftar Proyek</a>
-                                <a class="nav-link {{ request()->routeIs('projects.create') ? 'active' : '' }}" href="{{ route('projects.create') }}">Buat Proyek Baru</a>
+                                <a class="nav-link {{ request()->routeIs('projects.create-v2') ? 'active' : '' }}" href="{{ route('projects.create-v2') }}">Buat Proyek Baru</a>
                             </nav>
                         </div>
 
@@ -100,6 +94,16 @@
                         <a class="nav-link {{ request()->routeIs('workers.*') ? 'active' : '' }}" href="{{ route('workers.index') }}">
                             <div class="nav-link-icon"><i data-feather="users"></i></div>
                             Data Pekerja
+                        </a>
+
+                        <a class="nav-link {{ request()->routeIs('contractors.*') ? 'active' : '' }}" href="{{ route('contractors.index') }}">
+                            <div class="nav-link-icon"><i data-feather="truck"></i></div>
+                            Data Kontraktor
+                        </a>
+
+                        <a class="nav-link {{ request()->routeIs('kop-surat.*') ? 'active' : '' }}" href="{{ route('kop-surat.index') }}">
+                            <div class="nav-link-icon"><i data-feather="image"></i></div>
+                            Kop Surat
                         </a>
 
                         <!-- Menu Peran / Jabatan Tukang -->

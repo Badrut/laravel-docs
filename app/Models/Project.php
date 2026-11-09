@@ -16,8 +16,7 @@ class Project extends Model
         'implementation_period',
         'attendance_period',
 
-        'contractor_name',
-        'person_in_charge',
+        'contractor_id',
 
         'principal_name',
         'principal_nip',
@@ -28,6 +27,7 @@ class Project extends Model
         'admin_head_name',
         'admin_head_nip',
         'budget_date',
+        'offer_date',
         'invitation_date',
         'invitation_number',
         'contractor_date',
@@ -40,7 +40,6 @@ class Project extends Model
         'payment_report_number',
         'receipt_date',
         'receipt_number',
-        'contractor_address',
         'receipt_receiver',
         'tax_vat',
         'tax_pph21',
@@ -48,8 +47,25 @@ class Project extends Model
         'tax_pph23',
         'tax_pph_final',
         'kop_school',
-        'kop_contractor'
+        'kop_contractor',
+        'kop_school_id',
+        'kop_contractor_id'
     ];
+
+    public function contractor()
+    {
+        return $this->belongsTo(Contractor::class);
+    }
+
+    public function kopSchool()
+    {
+        return $this->belongsTo(KopSurat::class, 'kop_school_id');
+    }
+
+    public function kopContractor()
+    {
+        return $this->belongsTo(KopSurat::class, 'kop_contractor_id');
+    }
 
     public function items()
     {

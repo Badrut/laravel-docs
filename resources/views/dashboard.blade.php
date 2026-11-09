@@ -15,7 +15,7 @@
                         <div class="page-header-subtitle">Ringkasan dan Daftar Dokumen SPJ SMKN 2 Karanganyar</div>
                     </div>
                     <div class="col-12 col-xl-auto mt-4">
-                        <a href="{{ route('projects.create') }}" class="btn btn-white text-primary fw-500">
+                        <a href="{{ route('projects.create-v2') }}" class="btn btn-white text-primary fw-500">
                             <i class="fa-solid fa-plus-circle me-2"></i> Buat SPJ Baru
                         </a>
                     </div>
@@ -41,7 +41,7 @@
         <div class="row">
             <!-- Card 1: Total SPJ -->
             <div class="col-lg-6 col-xl-3 mb-4">
-                <div class="card bg-primary text-white h-100">
+                <div class="card bg-secondary text-white h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="me-3">
@@ -124,7 +124,7 @@
                         <tr>
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td>{{ $project->project_name }}</td>
-                            <td>{{ $project->contractor_name ?? '-' }}</td>
+                            <td>{{ $project->contractor->company_name ?? '-' }}</td>
                             <td>Rp {{ number_format($total_budget, 0, ',', '.') }}</td>
                             <td>
                                 <span class="badge {{ $project->images->count() > 0 ? 'bg-success' : 'bg-secondary' }} rounded-pill">
@@ -160,7 +160,7 @@
                                     </div>
                                     
                                     <!-- Edit Button (Pastikan route projects.edit sudah dibuat di web.php) -->
-                                    <a href="{{ route('projects.edit', $project->id) }}" class="btn btn-sm btn-info text-white" title="Edit Data">
+                                    <a href="{{ route('projects.edit-v2', $project->id) }}" class="btn btn-sm btn-info text-white" title="Edit Data">
                                         <i class="fa-solid fa-edit"></i>
                                     </a>
                                     

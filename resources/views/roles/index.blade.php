@@ -8,7 +8,7 @@
                 <div class="col-auto mt-4">
                     <h1 class="page-header-title">
                         <div class="page-header-icon"><i data-feather="briefcase"></i></div>
-                        Worker Roles
+                        Role Pekerja
                     </h1>
                     <div class="page-header-subtitle">Master data kategori pekerja dan upah standar</div>
                 </div>
@@ -19,13 +19,23 @@
 
 <div class="container-xl px-4 mt-n10">
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow mb-4" role="alert">{{ session('success') }}</div>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     @endif
 
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Daftar Role</span>
-            <a href="{{ route('roles.create') }}" class="btn btn-sm btn-light text-primary">
+            <a href="{{ route('roles.create') }}" class="btn btn-primary btn-sm">
                 <i class="me-1" data-feather="plus"></i> Tambah Role Baru
             </a>
         </div>
@@ -41,15 +51,24 @@
                 <tbody>
                     @foreach($roles as $role)
                     <tr>
-                        <td><strong>{{ $role->role_name }}</strong></td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {{ $role->role_name }}
+                            </div>
+                        </td>
                         <td>Rp {{ number_format($role->default_wage, 0, ',', '.') }}</td>
                         <td>
-                            <a class="btn btn-datatable btn-icon btn-transparent-dark me-2" href="{{ route('roles.edit', $role->id) }}">
+                            <!-- Tambahan title untuk Tooltip -->
+                            <a class="btn btn-datatable btn-icon btn-transparent-dark me-2" href="{{ route('roles.edit', $role->id) }}" title="Edit Role">
                                 <i data-feather="edit"></i>
                             </a>
                             <form action="{{ route('roles.destroy', $role->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus role ini? Pekerja dengan role ini mungkin akan terpengaruh.');">
-                                @csrf @method('DELETE')
-                                <button class="btn btn-datatable btn-icon btn-transparent-dark border-0"><i data-feather="trash-2"></i></button>
+                                @csrf 
+                                @method('DELETE')
+                                <!-- Tambahan title untuk Tooltip -->
+                                <button type="submit" class="btn btn-datatable btn-icon btn-transparent-dark border-0" title="Hapus Role">
+                                    <i data-feather="trash-2"></i>
+                                </button>
                             </form>
                         </td>
                     </tr>
@@ -59,4 +78,29 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('js')
+<script>
+    $(document).ready(function() {
+        $('#datatablesSimple').DataTable({
+            // Terjemahan Bahasa Indonesia Manual
+            language: {
+                "search": "Cari:",
+                "lengthMenu": "Tampilkan _MENU_ data",
+                "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+                "infoEmpty": "Menampilkan 0 sampai 0 dari 0 data",
+                "infoFiltered": "(disaring dari total _MAX_ data)",
+                "zeroRecords": "Data tidak ditemukan",
+                "emptyTable": "Tidak ada data yang tersedia di tabel",
+                "paginate": {
+                    "first": "Awal",
+                    "last": "Akhir",
+                    "next": "Lanjut",
+                    "previous": "Kembali"
+                }
+            }
+        });
+    });
+</script>
 @endsection

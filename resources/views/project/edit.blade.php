@@ -197,12 +197,14 @@
                                             </div>
                                             <div class="mb-3">
                                                 <label class="small mb-1">Kontraktor / Toko</label>
-                                                <input type="text" name="contractor_name" class="form-control" value="{{ old('contractor_name', $project->contractor_name) }}">
-                                                <input type="text" name="contractor_address" class="form-control mt-1" value="{{ old('contractor_address', $project->contractor_address) }}">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="small mb-1">Penanggung Jawab Kontraktor</label>
-                                                <input type="text" name="person_in_charge" class="form-control" value="{{ old('person_in_charge', $project->person_in_charge) }}">
+                                                <select name="contractor_id" class="form-control select2" style="width:100%;">
+                                                    <option value="">-- Pilih Kontraktor --</option>
+                                                    @foreach($contractors as $c)
+                                                        <option value="{{ $c->id }}" {{ ($project->contractor_id == $c->id) ? 'selected' : '' }}>
+                                                            {{ $c->company_name }} ({{ $c->person_in_charge ?? '-' }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="small mb-1">Tanggal Dokumen RAB</label>

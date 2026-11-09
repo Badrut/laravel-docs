@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Worker;
 use App\Models\WorkerRole;
+use App\Models\Contractor;
+use App\Models\KopSurat;
 use Illuminate\Http\Request;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +16,7 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        $projects = Project::with(['items', 'workers', 'images'])->latest()->get();
+        $projects = Project::with(['items', 'workers', 'images', 'contractor'])->latest()->get();
         
         return view('dashboard', compact('projects'));
     }
@@ -24,15 +26,127 @@ class ProjectController extends Controller
         $projects = Project::all();
         $workers = Worker::all();
         $roles = WorkerRole::all();
-        return view('project.create', compact('projects', 'workers', 'roles'));
+        return view('project.createv2', compact('projects', 'workers', 'roles'));
     }
     
+    public function createv2(){
+        $projects = Project::all();
+        $workers = Worker::all();
+        $roles = WorkerRole::all();
+        $contractors = Contractor::all();
+        $kopSekolah = KopSurat::sekolah()->get();
+        $kopKontraktor = KopSurat::kontraktor()->get();
+        return view('project.createv2', compact('projects', 'workers', 'roles', 'contractors', 'kopSekolah', 'kopKontraktor'));
+    }
+
     public function edit(Project $project) {
         $projects = Project::all();
         $workers = Worker::all();
         $roles = WorkerRole::all();
-        return view('project.edit', compact('project', 'projects', 'workers', 'roles'));
+        $contractors = Contractor::all();
+        $kopSekolah = KopSurat::sekolah()->get();
+        $kopKontraktor = KopSurat::kontraktor()->get();
+        return view('project.edit', compact('project', 'projects', 'workers', 'roles', 'contractors', 'kopSekolah', 'kopKontraktor'));
     }
+
+        public function editv2(Project $project) {
+        $projects = Project::all();
+        $workers = Worker::all();
+        $roles = WorkerRole::all();
+        $contractors = Contractor::all();
+        $kopSekolah = KopSurat::sekolah()->get();
+        $kopKontraktor = KopSurat::kontraktor()->get();
+        return view('project.editv2', compact('project', 'projects', 'workers', 'roles', 'contractors', 'kopSekolah', 'kopKontraktor'));
+    }
+
+
+
+    /**
+     * Import RAB items from Excel file (format: template_excelv2.xlsx)
+     * Reads Section A (ALAT DAN BAHAN → material) and Section B (UPAH TUKANG DAN TENAGA → labor)
+     * Columns: A=No, B=Nama, C=Volume, D=Satuan, E=Harga Satuan, F=Jumlah
+     */
+    public function importRab(Request $request)
+{
+    // Tambahkan 'csv' pada mimes jika user mengunggah file dalam format CSV
+    $request->validate([
+        'rab_file' => 'required|file|mimes:xlsx,xls,csv',
+    ]);
+
+    try {
+        $file = $request->file('rab_file');
+        $spreadsheet = IOFactory::load($file->getPathname());
+        $sheet = $spreadsheet->getActiveSheet();
+        $items = [];
+
+        // Baris 1 adalah Header (NO, NAMA BARANG, dst), jadi data dimulai dari baris 2
+        $startRow = 2;
+        $maxRow = $sheet->getHighestRow();
+        $currentType = 'material'; // Default awal
+
+        for ($row = $startRow; $row <= $maxRow; $row++) {
+            // Gunakan getCalculatedValue() untuk mengantisipasi jika cell adalah hasil rumus/formula
+            $colA = trim((string) $sheet->getCell("A{$row}")->getCalculatedValue());
+            $colB = trim((string) $sheet->getCell("B{$row}")->getCalculatedValue());
+            $colC = $sheet->getCell("C{$row}")->getCalculatedValue();
+            $colD = trim((string) $sheet->getCell("D{$row}")->getCalculatedValue());
+            $colE = $sheet->getCell("E{$row}")->getCalculatedValue();
+
+            // 1. Deteksi Header Bagian: "A" -> Alat & Bahan, "B" -> Upah Tukang
+            if (preg_match('/^[A-Z]$/i', $colA) && !is_numeric($colA)) {
+                if (strtoupper($colA) === 'A') {
+                    $currentType = 'material';
+                } elseif (strtoupper($colA) === 'B') {
+                    $currentType = 'labor';
+                }
+                continue;
+            }
+
+            // 2. Lewati baris rekapitulasi "Jumlah Total"
+            if (stripos($colB, 'Jumlah Total') !== false) {
+                continue;
+            }
+
+            // 3. Lewati baris kosong atau baris yang Kolom A-nya bukan angka (bukan nomor urut)
+            if (!is_numeric($colA) || empty($colB)) {
+                continue;
+            }
+
+            // 4. Ambil data: Kolom C (Volume) dan Kolom E (Harga Satuan) harus berupa angka
+            if (is_numeric($colC) && is_numeric($colE)) {
+                $items[] = [
+                    'type'       => $currentType,
+                    'item_name'  => $colB,
+                    'quantity'   => (float) $colC,
+                    'unit'       => $colD,
+                    'unit_price' => (float) $colE,
+                ];
+            }
+        }
+
+        if (empty($items)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ditemukan data item RAB di file Excel. Pastikan format sesuai template.',
+            ], 422);
+        }
+
+        $materialCount = count(array_filter($items, fn($i) => $i['type'] === 'material'));
+        $laborCount = count(array_filter($items, fn($i) => $i['type'] === 'labor'));
+
+        return response()->json([
+            'success' => true,
+            'message' => "Berhasil import {$materialCount} item Alat & Bahan dan {$laborCount} item Upah Tukang dari Excel.",
+            'items'   => $items,
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal membaca file Excel: ' . $e->getMessage(),
+        ], 500);
+    }
+}
 
     public function store(Request $request)
     {
@@ -41,11 +155,11 @@ class ProjectController extends Controller
             'project_name'              => 'required|string|max:255',
             'start_date'                => 'required|date',
             'end_date'                  => 'required|date|after_or_equal:start_date',
-            'contractor_name'           => 'nullable|string|max:255',
+            'contractor_id'             => 'nullable|exists:contractors,id',
             'contractor_number'         => 'nullable|string|max:255',
             'contractor_date'           => 'nullable|date',
-            'person_in_charge'          => 'nullable|string|max:255',
             'budget_date'               => 'nullable|date',
+            'offer_date'                => 'nullable|date',
             'principal_name'            => 'nullable|string|max:255',
             'principal_nip'             => 'nullable|string|max:50',
             'facilities_head_name'      => 'nullable|string|max:255',
@@ -82,6 +196,8 @@ class ProjectController extends Controller
             'images.*'                  => 'image|mimes:jpeg,png,jpg',
             'kop_school'                => 'nullable|image|mimes:jpeg,png,jpg',
             'kop_contractor'            => 'nullable|image|mimes:jpeg,png,jpg',
+            'kop_school_id'             => 'nullable|exists:kop_surats,id',
+            'kop_contractor_id'         => 'nullable|exists:kop_surats,id',
         ]);             
 
         DB::beginTransaction();
@@ -109,11 +225,9 @@ class ProjectController extends Controller
                 'target_days'               => $targetDays,
                 'implementation_period'     => $implementationPeriod,
                 'attendance_period'         => $attendancePeriod,
-                'contractor_name'           => $request->contractor_name,
+                'contractor_id'             => $request->contractor_id,
                 'contractor_number'         => $request->contractor_number,
                 'contractor_date'           => $request->contractor_date,
-                'contractor_address'        => $request->contractor_address,
-                'person_in_charge'          => $request->person_in_charge,
                 'principal_name'            => $request->principal_name,
                 'principal_nip'             => $request->principal_nip,
                 'facilities_head_name'      => $request->facilities_head_name,
@@ -123,6 +237,7 @@ class ProjectController extends Controller
                 'admin_head_name'           => $request->admin_head_name,
                 'admin_head_nip'            => $request->admin_head_nip,
                 'budget_date'               => $request->budget_date,
+                'offer_date'                => $request->offer_date,
                 'work_order_number'         => $request->work_order_number,
                 'work_order_date'           => $request->work_order_date,
                 'handover_report_number'    => $request->handover_report_number,
@@ -139,6 +254,8 @@ class ProjectController extends Controller
                 'tax_pph22'                 => $request->tax_pph22 ?? 0,
                 'tax_pph23'                 => $request->tax_pph23 ?? 0,
                 'tax_pph_final'             => $request->tax_pph_final ?? 0,
+                'kop_school_id'             => $request->kop_school_id,
+                'kop_contractor_id'         => $request->kop_contractor_id,
             ]);
 
             foreach ($request->items as $item) {
@@ -177,6 +294,7 @@ class ProjectController extends Controller
                 }
             }
 
+            // Handle kop_school file upload (legacy) - jika pakai dropdown, skip ini
             if ($request->hasFile('kop_school')) {
                 $kop = $request->file('kop_school');
                 if ($kop->isValid()) {
@@ -184,6 +302,12 @@ class ProjectController extends Controller
                     if ($kopSchoolPath !== false) {
                         $project->update(['kop_school' => $kopSchoolPath]);
                     }
+                }
+            } elseif ($request->kop_school_id) {
+                // Copy path dari kop_surats ke kop_school untuk backward compatibility
+                $kopSurat = KopSurat::find($request->kop_school_id);
+                if ($kopSurat) {
+                    $project->update(['kop_school' => $kopSurat->image_path]);
                 }
             }
 
@@ -194,6 +318,11 @@ class ProjectController extends Controller
                     if ($kopContractorPath !== false) {
                         $project->update(['kop_contractor' => $kopContractorPath]);
                     }
+                }
+            } elseif ($request->kop_contractor_id) {
+                $kopSurat = KopSurat::find($request->kop_contractor_id);
+                if ($kopSurat) {
+                    $project->update(['kop_contractor' => $kopSurat->image_path]);
                 }
             }
 
@@ -211,17 +340,21 @@ class ProjectController extends Controller
         }
     }
 
+    public function show(){
+
+    }
+
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
             'project_name'              => 'required|string|max:255',
             'start_date'                => 'required|date',
             'end_date'                  => 'required|date|after_or_equal:start_date',
-            'contractor_name'           => 'nullable|string|max:255',
+            'contractor_id'             => 'nullable|exists:contractors,id',
             'contractor_number'         => 'nullable|string|max:255',
             'contractor_date'           => 'nullable|date',
-            'person_in_charge'          => 'nullable|string|max:255',
             'budget_date'               => 'nullable|date',
+            'offer_date'                => 'nullable|date',
             'principal_name'            => 'nullable|string|max:255',
             'principal_nip'             => 'nullable|string|max:50',
             'facilities_head_name'      => 'nullable|string|max:255',
@@ -285,11 +418,9 @@ class ProjectController extends Controller
                 'target_days'               => $targetDays,
                 'implementation_period'     => $implementationPeriod,
                 'attendance_period'         => $attendancePeriod,
-                'contractor_name'           => $request->contractor_name,
+                'contractor_id'             => $request->contractor_id,
                 'contractor_number'         => $request->contractor_number,
                 'contractor_date'           => $request->contractor_date,
-                'contractor_address'        => $request->contractor_address,
-                'person_in_charge'          => $request->person_in_charge,
                 'principal_name'            => $request->principal_name,
                 'principal_nip'             => $request->principal_nip,
                 'facilities_head_name'      => $request->facilities_head_name,
@@ -299,6 +430,7 @@ class ProjectController extends Controller
                 'admin_head_name'           => $request->admin_head_name,
                 'admin_head_nip'            => $request->admin_head_nip,
                 'budget_date'               => $request->budget_date,
+                'offer_date'                => $request->offer_date,
                 'work_order_number'         => $request->work_order_number,
                 'work_order_date'           => $request->work_order_date,
                 'handover_report_number'    => $request->handover_report_number,
@@ -424,7 +556,8 @@ class ProjectController extends Controller
             'items',
             'projectWorkers.worker.role',
             'schedules',
-            'images'
+            'images',
+            'contractor'
         ])->findOrFail($id);
 
         $templatePath = storage_path('app/public/template_spj.docx');
@@ -440,6 +573,8 @@ class ProjectController extends Controller
         $safeName        = preg_replace('/[^A-Za-z0-9_\-]/', '_', $project->project_name);
         $workingTemplate = $tempDir . '/tpl_' . $safeName . '_' . time() . '.docx';
         copy($templatePath, $workingTemplate);
+
+        \PhpOffice\PhpWord\Settings::setOutputEscapingEnabled(true);
 
         $this->replaceKopDocx($workingTemplate, $project);
 
@@ -542,11 +677,12 @@ class ProjectController extends Controller
         $templateProcessor->setValue('invitation_date_monthly', $formatTanggalAngka($project->invitation_date));
         $templateProcessor->setValue('contractor_date', $formatTanggalDenganHari($project->contractor_date));
         $templateProcessor->setValue('budget_date', $formatHanyaTanggal($project->budget_date));
+        $templateProcessor->setValue('offer_date', $formatHanyaTanggal($project->offer_date));
         $templateProcessor->setValue('work_order_date', $formatHanyaTanggal($project->work_order_date));
         $templateProcessor->setValue('handover_report_date', $formatHanyaTanggal($project->handover_report_date));
         $templateProcessor->setValue('receipt_date', $formatHanyaTanggal($project->receipt_date));
-        $templateProcessor->setValue('contractor_name', $project->contractor_name ?? '-');
-        $templateProcessor->setValue('contractor_address', $project->contractor_address ?? '-');
+        $templateProcessor->setValue('company_name', $project->contractor->company_name ?? '-');
+        $templateProcessor->setValue('company_address', $project->contractor->address ?? '-');
         $templateProcessor->setValue('invitation_number', $project->invitation_number ?? '-');
         $templateProcessor->setValue('contractor_number', $project->contractor_number ?? '-');
         $templateProcessor->setValue('work_order_number', $project->work_order_number ?? '-');
@@ -554,7 +690,7 @@ class ProjectController extends Controller
         $templateProcessor->setValue('receipt_number', $project->receipt_number ?? '-');
         $templateProcessor->setValue('receipt_receiver', $project->receipt_receiver ?? '-');
         $templateProcessor->setValue('target_days' , $project->target_days);
-        $templateProcessor->setValue('person_in_charge', $project->person_in_charge);
+        $templateProcessor->setValue('person_in_charge', $project->contractor->person_in_charge ?? '-');
         $materials = $project->items->where('type', 'material')->values();
         $labors = $project->items->where('type', 'labor')->values();
 
@@ -675,13 +811,13 @@ class ProjectController extends Controller
 
         foreach ($groupedWorkers as $roleId => $pws) {
             $role = $pws->first()->worker->role;
-            $namaPekerja = $pws->pluck('worker.name')->implode(', ');
-            $qty = $totalHariKerja * $pws->count();
+            $jumlahPekerja = $pws->count();
+            $qty = $totalHariKerja * $jumlahPekerja;
             
             $laborsData[] = (object)[
-                'item_name'  => $namaPekerja,
-                'quantity'   => $qty,
-                'unit'       => $role->role_name, 
+                'item_name'  => $role->role_name,         
+                'quantity'   => $qty,                      
+                'unit'       => 'Orang',                   
                 'unit_price' => $role->default_wage,
             ];
         }
@@ -830,13 +966,28 @@ class ProjectController extends Controller
 
         $templateProcessor->saveAs($tempFile);
         @unlink($workingTemplate);
-        return response()->download($tempFile)->deleteFileAfterSend(true);
+
+        // Fix XML orphan tags dari deleteBlock/cloneBlock PhpWord
+        $this->repairDocxXml($tempFile);
+
+        $fileName = 'SPJ_' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $project->project_name) . '_' . time() . '.docx';
+
+        // Gunakan response()->download() dengan header anti-compression
+        // agar Cloudflare/proxy tidak merusak file .docx (yang sudah ZIP)
+        $headers = [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Encoding'    => 'identity',
+            'Cache-Control'       => 'no-store, no-transform',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        return response()->download($tempFile, $fileName, $headers)->deleteFileAfterSend(true);
     }
 
     private function replaceKopDocx(string $docxPath, $project): void
     {
         $kopMap = [
-            'kop_contractor'   => 'image6.jpg',
+            'kop_contractor'   => 'image3.jpg',
             'kop_school' => 'image1.jpg',
             
         ];
@@ -930,6 +1081,42 @@ class ProjectController extends Controller
         $zip->close();
     }
 
+    /**
+     * Repair broken XML in generated .docx files.
+     * PhpWord's deleteBlock/cloneBlock can leave orphaned <w:p> tags
+     * (opening tag without closing tag), making the XML invalid and
+     * Word unable to open the file.
+     */
+    private function repairDocxXml(string $docxPath): void
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($docxPath) !== true) {
+            return;
+        }
+
+        $xml = $zip->getFromName('word/document.xml');
+        if ($xml === false) {
+            $zip->close();
+            return;
+        }
+
+        // Cari dan hapus <w:p ...> yang orphan (tidak punya </w:p> penutup)
+        // Pattern: <w:p ...> langsung diikuti <w:p ...> tanpa </w:p> di antaranya
+        // Ini terjadi ketika deleteBlock menghapus konten tapi menyisakan tag pembuka
+        $repaired = preg_replace(
+            '/<w:p\b[^>]*>(\s*)<w:p\b/',
+            '<w:p',
+            $xml
+        );
+
+        // Jika ada perubahan, simpan kembali
+        if ($repaired !== $xml) {
+            $zip->addFromString('word/document.xml', $repaired);
+        }
+
+        $zip->close();
+    }
+
     private function setTtdKwitansi($sheet, $project) {
         $sheet->setCellValue('A29', $project->treasurer_name ?? 'Gunarni Sugeng Saputra');
         $sheet->setCellValue('A30', 'NIP. ' . ($project->treasurer_nip ?? '19750519 200701 1 009'));
@@ -980,7 +1167,7 @@ class ProjectController extends Controller
         ini_set('memory_limit', '-1');
         ini_set('max_execution_time', '300');
 
-        $project = Project::with(['projectWorkers.worker', 'schedules', 'items'])->findOrFail($id);
+        $project = Project::with(['projectWorkers.worker', 'schedules', 'items', 'contractor'])->findOrFail($id);
 
         $templatePath = storage_path('app/public/template_kwitansi.xlsx');
         if (!file_exists($templatePath)) {
@@ -1012,9 +1199,10 @@ class ProjectController extends Controller
         $tahun = $tglTerakhir ? $tglTerakhir->format('Y') : date('Y');
         $tglFormat = $tglTerakhir ? $tglTerakhir->format('d/m/Y') : date('d/m/Y');
         $sheetBahan->setCellValue('C5', $tahun);
+        $sheetBahan->setCellValue('E5', 'No.KK' . substr($tahun, -2)); // Dinamis: No.KK26, No.KK27, dst
         $sheetBahan->setCellValue('C6', $tglFormat);
         $sheetBahan->setCellValue('C9', $this->formatKwitansi($subtotalM));
-        $sheetBahan->setCellValue('C10', $project->contractor_name ?? 'TB. SUKSES');
+        $sheetBahan->setCellValue('C10', $project->contractor->company_name ?? 'TB. SUKSES');
         $sheetBahan->setCellValue('C11', 'Bahan dan Material Bangunan ' . $project->project_name);
         $pct_ppn   = $project->tax_vat ?? 0;
         $pct_pph22 = $project->tax_pph22 ?? 0;
@@ -1067,6 +1255,7 @@ class ProjectController extends Controller
 
         $this->setTtdKwitansi($sheetBahan, $project);
         $sheetTukang->setCellValue('C5', $tahun);
+        $sheetTukang->setCellValue('E5', 'No.KK' . substr($tahun, -2));
         $sheetTukang->setCellValue('C6', $tglFormat);
         $sheetTukang->setCellValue('C9', $this->formatKwitansi($subtotalL));
         $sheetTukang->setCellValue('C10', 'Tukang / Pekerja'); 
@@ -1098,7 +1287,11 @@ class ProjectController extends Controller
         $spreadsheet->disconnectWorksheets();
         unset($spreadsheet);
 
-        return response()->download($tempFile)->deleteFileAfterSend(true);
+        return response()->download($tempFile, $fileName, [
+            'Content-Type'     => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Encoding' => 'identity',
+            'Cache-Control'    => 'no-store, no-transform',
+        ])->deleteFileAfterSend(true);
     }
 
     public function exportAbsensi($id)
@@ -1106,7 +1299,7 @@ class ProjectController extends Controller
         ini_set('memory_limit', '-1');
         ini_set('max_execution_time', '600');
 
-        $project = Project::with(['projectWorkers.worker.role', 'schedules', 'items'])->findOrFail($id);
+        $project = Project::with(['projectWorkers.worker.role', 'schedules', 'items', 'contractor'])->findOrFail($id);
 
         $templatePath = storage_path('app/public/template_absensi.xlsx');
         if (!file_exists($templatePath)) {
@@ -1274,7 +1467,7 @@ class ProjectController extends Controller
         $sheetRealisasi->duplicateStyle($styleReal, "A".($rowReal+1).":C".($rowReal+2));
 
         $sheetRealisasi->setCellValue('A' . $rowReal, 1);
-        $sheetRealisasi->setCellValue('B' . $rowReal, 'Pengadaan Bahan / Material ' . ($project->contractor_name ?? 'TB. Sukses'));
+        $sheetRealisasi->setCellValue('B' . $rowReal, 'Pengadaan Bahan / Material ' . ($project->contractor->company_name ?? 'TB. Sukses'));
         $sheetRealisasi->setCellValue('D' . $rowReal, $subtotalM);
         
         $rowReal++;
@@ -1295,7 +1488,7 @@ class ProjectController extends Controller
         $sheetAlamat->setTitle('Alamat Pekerja');
         
         $spreadsheet->addSheet($sheetAlamat);
-        $namaKontraktor = strtoupper($project->contractor_name ?? 'TB. SUKSES');
+        $namaKontraktor = strtoupper($project->contractor->company_name ?? 'TB. SUKSES');
         $sheetAlamat->setCellValue('A1', 'NAMA PEKERJA ' . $namaKontraktor);
 
         $sheetAlamat->mergeCells('A1:E1');
@@ -1345,7 +1538,11 @@ class ProjectController extends Controller
         unset($spreadsheet);
         gc_collect_cycles();
 
-        return response()->download($tempFile)->deleteFileAfterSend(true);
+        return response()->download($tempFile, $fileName, [
+            'Content-Type'     => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Encoding' => 'identity',
+            'Cache-Control'    => 'no-store, no-transform',
+        ])->deleteFileAfterSend(true);
     }
 
     private function generateFooter($sheet, $startRow, $tglFull, $project, $isHonor = false)

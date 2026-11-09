@@ -25,10 +25,17 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Daftar Pengguna</span>
-            <a href="{{ route('users.create') }}" class="btn btn-sm btn-light text-primary">
+            <a href="{{ route('users.create') }}" class="btn btn-primary btn-sm">
                 <i class="me-1" data-feather="user-plus"></i> Tambah User Baru
             </a>
         </div>
@@ -51,16 +58,24 @@
                         </td>
                         <td>{{ $user->email }}</td>
                         <td>
-                            <a class="btn btn-datatable btn-icon btn-transparent-dark me-2" href="{{ route('users.edit', $user->id) }}">
+                            <!-- Tambahan title untuk Tooltip -->
+                            <a class="btn btn-datatable btn-icon btn-transparent-dark me-2" href="{{ route('users.edit', $user->id) }}" title="Edit User">
                                 <i data-feather="edit"></i>
                             </a>
-                            <form action="{{ route('users.destroy', $user->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus user ini?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-datatable btn-icon btn-transparent-dark border-0">
-                                    <i data-feather="trash-2"></i>
+                            @if(auth()->id() !== $user->id)
+                                <form action="{{ route('users.destroy', $user->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus user ini?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <!-- Tambahan title untuk Tooltip -->
+                                    <button type="submit" class="btn btn-datatable btn-icon btn-transparent-dark border-0" title="Hapus User">
+                                        <i data-feather="trash-2"></i>
+                                    </button>
+                                </form>
+                            @else
+                                <button class="btn btn-datatable btn-icon btn-transparent-dark border-0" disabled title="Tidak bisa hapus akun sendiri">
+                                    <i data-feather="trash-2" style="opacity: 0.3;"></i>
                                 </button>
-                            </form>
+                            @endif
                         </td>
                     </tr>
                     @endforeach
@@ -75,7 +90,6 @@
 <script>
     $(document).ready(function() {
         $('#datatablesSimple').DataTable({
-            // Terjemahan Bahasa Indonesia Manual (Bebas CORS!)
             language: {
                 "search": "Cari:",
                 "lengthMenu": "Tampilkan _MENU_ data",
